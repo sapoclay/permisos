@@ -1,7 +1,7 @@
-#sudo apt-get install python3-tk
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 import subprocess
+import webbrowser
 
 def crear_usuario():
     username = username_entry.get()
@@ -12,12 +12,12 @@ def crear_usuario():
         except subprocess.CalledProcessError:
             messagebox.showerror("Error", "No se pudo crear el usuario.")
     else:
-        messagebox.showwarning("Advertencia", "Por favor, ingresa un nombre de usuario.")
+        messagebox.showwarning("Advertencia", "Por favor, escribe un nombre de usuario.")
 
 def eliminar_usuario():
     username = users_dropdown.get()
     if username:
-        confirmar = messagebox.askyesno("Confirmar", f"¿Estás seguro de que deseas eliminar al usuario {username} y su carpeta de inicio?")
+        confirmar = messagebox.askyesno("Confirmar", f"¿Estás seguro de que quieres eliminar al usuario {username} y su carpeta de inicio?")
         if confirmar:
             try:
                 subprocess.run(["sudo", "userdel", "-r", username])
@@ -40,7 +40,7 @@ def crear_grupo():
         except subprocess.CalledProcessError:
             messagebox.showerror("Error", "No se pudo crear el grupo.")
     else:
-        messagebox.showwarning("Advertencia", "Por favor, ingresa un nombre de grupo.")
+        messagebox.showwarning("Advertencia", "Por favor, escribe un nombre para el grupo.")
 
 def agregar_a_grupos():
     username = users_dropdown_groups.get()
@@ -55,7 +55,7 @@ def agregar_a_grupos():
             # Actualizar los checkboxes después de agregar al usuario a los grupos
             mostrar_grupos()
         except subprocess.CalledProcessError:
-            messagebox.showerror("Error", "No se pudo agregar al usuario a los grupos.")
+            messagebox.showerror("Error", "No se pudo añadir al usuario a los grupos.")
     elif not username:
         messagebox.showwarning("Advertencia", "Por favor, selecciona un usuario.")
     else:
@@ -81,10 +81,19 @@ grupos = subprocess.check_output(["cut", "-d:", "-f1", "/etc/group"]).decode("ut
 # Crear la ventana principal
 window = tk.Tk()
 window.title("Administración de usuarios y grupos")
-window.geometry("850x850")
+window.geometry("950x950")
+
+# Enlace centrado
+enlace_label = tk.Label(window, text="Más, pero quizás menos bueno!!", fg="blue", cursor="hand2", font=("Arial", 12, "bold"))
+enlace_label.pack(pady=10)
+enlace_label.bind("<Button-1>", lambda e: webbrowser.open("https://entreunosyceros.net/about/"))
+
+# Crea un separador horizontal
+separador = ttk.Separator(window, orient="horizontal")
+separador.pack(fill="x", padx=10, pady=10)
 
 # Etiqueta y campo de entrada para el nombre de usuario
-username_label = tk.Label(window, text="Nombre de usuario:")
+username_label = tk.Label(window, text="Nombre de usuario:", font=("Arial", 12, "bold"))
 username_label.pack()
 username_entry = tk.Entry(window)
 username_entry.pack()
@@ -93,8 +102,12 @@ username_entry.pack()
 crear_button = tk.Button(window, text="Crear usuario", command=crear_usuario)
 crear_button.pack(pady=5)
 
+# Crea un separador horizontal
+separador = ttk.Separator(window, orient="horizontal")
+separador.pack(fill="x", padx=10, pady=10)
+
 # Menú desplegable para seleccionar un usuario existente y eliminarlo
-username_label = tk.Label(window, text="Seleccionar usuario:")
+username_label = tk.Label(window, text="Seleccionar usuario para eliminar:", font=("Arial", 12, "bold"))
 username_label.pack()
 users_dropdown = tk.StringVar(window)
 users_dropdown.set(usuarios[0])  # Establecer el valor inicial del menú
@@ -104,8 +117,12 @@ users_menu.pack()
 eliminar_button = tk.Button(window, text="Eliminar usuario", command=eliminar_usuario)
 eliminar_button.pack(pady=5)
 
+# Crea un separador horizontal
+separador = ttk.Separator(window, orient="horizontal")
+separador.pack(fill="x", padx=10, pady=10)
+
 # Etiqueta y campo de entrada para el nombre del grupo
-group_label = tk.Label(window, text="Nombre del grupo:")
+group_label = tk.Label(window, text="Crear grupo con nombre:", font=("Arial", 12, "bold"))
 group_label.pack()
 group_entry = tk.Entry(window)
 group_entry.pack()
@@ -114,8 +131,33 @@ group_entry.pack()
 crear_grupo_button = tk.Button(window, text="Crear grupo", command=crear_grupo)
 crear_grupo_button.pack(pady=5)
 
+# Crea un separador horizontal
+separador = ttk.Separator(window, orient="horizontal")
+separador.pack(fill="x", padx=10, pady=10)
+
+# Menú desplegable para seleccionar un usuario existente para agregar a los grupos
+username_label_groups = tk.Label(window, text="Seleccionar usuario para añadir a grupos:", font=("Arial", 12, "bold"))
+username_label_groups.pack()
+users_dropdown_groups = tk.StringVar(window)
+users_dropdown_groups.set(usuarios[0])  # Establecer el valor inicial del menú
+users_menu_groups = tk.OptionMenu(window, users_dropdown_groups, *usuarios, command=mostrar_grupos)
+users_menu_groups.pack()
+
+# Crea un canvas con barra de desplazamiento vertical
+canvas = tk.Canvas(window)
+canvas.pack(side="left", fill="both", expand=True)
+
+scrollbar = tk.Scrollbar(window, orient="vertical", command=canvas.yview)
+scrollbar.pack(side="right", fill="y")
+
+canvas.configure(yscrollcommand=scrollbar.set)
+canvas.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+
+frame = tk.Frame(canvas)
+canvas.create_window((0, 0), window=frame, anchor="n")
+
 # Listado de checkboxes para seleccionar grupos
-groups_frame = tk.Frame(window)
+groups_frame = tk.Frame(frame)
 groups_frame.pack(pady=10)
 group_checkboxes = {}
 row = 0
@@ -130,17 +172,14 @@ for group in grupos:
         col = 0
         row += 1
 
-# Menú desplegable para seleccionar un usuario existente para agregar a los grupos
-username_label_groups = tk.Label(window, text="Seleccionar usuario:")
-username_label_groups.pack()
-users_dropdown_groups = tk.StringVar(window)
-users_dropdown_groups.set(usuarios[0])  # Establecer el valor inicial del menú
-users_menu_groups = tk.OptionMenu(window, users_dropdown_groups, *usuarios, command=mostrar_grupos)
-users_menu_groups.pack()
-
 # Botón para agregar al usuario a los grupos seleccionados
-agregar_grupos_button = tk.Button(window, text="Añadir a grupos", command=agregar_a_grupos)
+agregar_grupos_button = tk.Button(frame, text="Añadir a grupos", command=agregar_a_grupos)
 agregar_grupos_button.pack(pady=5)
+
+# Configurar el desplazamiento del canvas
+frame.update_idletasks()
+canvas.config(scrollregion=canvas.bbox("all"))
 
 # Ejecutar el bucle principal de la interfaz de usuario
 window.mainloop()
+
