@@ -4,111 +4,143 @@ from tkinter import messagebox
 import subprocess
 
 def crear_usuario():
-    nombre_usuario = campo_usuario.get()
-    contrasena = campo_contrasena.get()
+    username = username_entry.get()
+    if username:
+        try:
+            subprocess.run(["sudo", "useradd", "-m", username])
+            messagebox.showinfo("Éxito", f"El usuario {username} ha sido creado correctamente.")
+        except subprocess.CalledProcessError:
+            messagebox.showerror("Error", "No se pudo crear el usuario.")
+    else:
+        messagebox.showwarning("Advertencia", "Por favor, ingresa un nombre de usuario.")
 
-    grupos_seleccionados = obtener_grupos_seleccionados()
-    grupos_adicionales_seleccionados = obtener_grupos_adicionales_seleccionados()
+def eliminar_usuario():
+    username = users_dropdown.get()
+    if username:
+        confirmar = messagebox.askyesno("Confirmar", f"¿Estás seguro de que deseas eliminar al usuario {username} y su carpeta de inicio?")
+        if confirmar:
+            try:
+                subprocess.run(["sudo", "userdel", "-r", username])
+                messagebox.showinfo("Éxito", f"El usuario {username} y su carpeta de inicio han sido eliminados correctamente.")
+                # Actualizar los checkboxes después de eliminar al usuario
+                mostrar_grupos()
+            except subprocess.CalledProcessError:
+                messagebox.showerror("Error", "No se pudo eliminar el usuario.")
+        else:
+            messagebox.showinfo("Información", "La eliminación del usuario ha sido cancelada.")
+    else:
+        messagebox.showwarning("Advertencia", "Por favor, selecciona un usuario.")
 
-    comando_usuario = f'useradd -m -p {contrasena} -G {",".join(grupos_seleccionados + grupos_adicionales_seleccionados)} {nombre_usuario}'
-    comando_carpeta = f'mkdir /home/{nombre_usuario}'
+def crear_grupo():
+    groupname = group_entry.get()
+    if groupname:
+        try:
+            subprocess.run(["sudo", "groupadd", groupname])
+            messagebox.showinfo("Éxito", f"El grupo {groupname} ha sido creado correctamente.")
+        except subprocess.CalledProcessError:
+            messagebox.showerror("Error", "No se pudo crear el grupo.")
+    else:
+        messagebox.showwarning("Advertencia", "Por favor, ingresa un nombre de grupo.")
 
-    try:
-        subprocess.run(comando_usuario, shell=True, check=True)
-        subprocess.run(comando_carpeta, shell=True, check=True)
-        messagebox.showinfo("Éxito", f"Usuario {nombre_usuario} creado con éxito")
-    except subprocess.CalledProcessError:
-        messagebox.showerror("Error", "Error al crear el usuario")
+def agregar_a_grupos():
+    username = users_dropdown_groups.get()
+    selected_groups = []
+    for group, var in group_checkboxes.items():
+        if var.get():
+            selected_groups.append(group)
+    if username and selected_groups:
+        try:
+            subprocess.run(["sudo", "usermod", "-aG", ",".join(selected_groups), username])
+            messagebox.showinfo("Éxito", f"El usuario {username} ha sido agregado a los grupos seleccionados.")
+            # Actualizar los checkboxes después de agregar al usuario a los grupos
+            mostrar_grupos()
+        except subprocess.CalledProcessError:
+            messagebox.showerror("Error", "No se pudo agregar al usuario a los grupos.")
+    elif not username:
+        messagebox.showwarning("Advertencia", "Por favor, selecciona un usuario.")
+    else:
+        messagebox.showwarning("Advertencia", "Por favor, selecciona al menos un grupo.")
 
-def obtener_grupos_seleccionados():
-    grupos_seleccionados = []
-    for i, grupo in enumerate(grupos):
-        if grupo.get():
-            grupos_seleccionados.append(grupos_nombres[i])
-    return grupos_seleccionados
+def mostrar_grupos(*args):
+    selected_user = users_dropdown.get() if args == () else users_dropdown_groups.get()
+    if selected_user:
+        user_groups = subprocess.check_output(["id", "-Gn", selected_user]).decode("utf-8").strip().split(" ")
+        for group, var in group_checkboxes.items():
+            if group in user_groups:
+                var.set(True)
+            else:
+                var.set(False)
+    else:
+        for var in group_checkboxes.values():
+            var.set(False)
 
-def obtener_grupos_adicionales_seleccionados():
-    grupos_adicionales_seleccionados = []
-    for i, grupo_adicional in enumerate(grupos_adicionales):
-        if grupo_adicional.get():
-            grupos_adicionales_seleccionados.append(grupos_adicionales_nombres[i])
-    return grupos_adicionales_seleccionados
+# Obtener la lista de usuarios y grupos del sistema
+usuarios = subprocess.check_output(["cut", "-d:", "-f1", "/etc/passwd"]).decode("utf-8").splitlines()
+grupos = subprocess.check_output(["cut", "-d:", "-f1", "/etc/group"]).decode("utf-8").splitlines()
 
-def cargar_grupos():
-    resultado = subprocess.run("cut -d: -f1 /etc/group", shell=True, capture_output=True, text=True)
-    grupos_disponibles = resultado.stdout.strip().split('\n')
-    return grupos_disponibles
+# Crear la ventana principal
+window = tk.Tk()
+window.title("Administración de usuarios y grupos")
+window.geometry("850x850")
 
-ventana = tk.Tk()
-ventana.title("Interfaz para administración de usuarios")
+# Etiqueta y campo de entrada para el nombre de usuario
+username_label = tk.Label(window, text="Nombre de usuario:")
+username_label.pack()
+username_entry = tk.Entry(window)
+username_entry.pack()
 
-etiqueta_usuario = tk.Label(ventana, text="Nombre de usuario:")
-etiqueta_usuario.pack()
+# Botón para crear usuarios
+crear_button = tk.Button(window, text="Crear usuario", command=crear_usuario)
+crear_button.pack(pady=5)
 
-campo_usuario = tk.Entry(ventana)
-campo_usuario.pack()
+# Menú desplegable para seleccionar un usuario existente y eliminarlo
+username_label = tk.Label(window, text="Seleccionar usuario:")
+username_label.pack()
+users_dropdown = tk.StringVar(window)
+users_dropdown.set(usuarios[0])  # Establecer el valor inicial del menú
+users_menu = tk.OptionMenu(window, users_dropdown, *usuarios, command=mostrar_grupos)
+users_menu.pack()
 
-etiqueta_contrasena = tk.Label(ventana, text="Contraseña:")
-etiqueta_contrasena.pack()
+eliminar_button = tk.Button(window, text="Eliminar usuario", command=eliminar_usuario)
+eliminar_button.pack(pady=5)
 
-campo_contrasena = tk.Entry(ventana, show="*")
-campo_contrasena.pack()
+# Etiqueta y campo de entrada para el nombre del grupo
+group_label = tk.Label(window, text="Nombre del grupo:")
+group_label.pack()
+group_entry = tk.Entry(window)
+group_entry.pack()
 
-etiqueta_grupo = tk.Label(ventana, text="Grupos:")
-etiqueta_grupo.pack()
+# Botón para crear un grupo
+crear_grupo_button = tk.Button(window, text="Crear grupo", command=crear_grupo)
+crear_grupo_button.pack(pady=5)
 
-scrolled_frame = tk.Frame(ventana)
-scrolled_frame.pack()
+# Listado de checkboxes para seleccionar grupos
+groups_frame = tk.Frame(window)
+groups_frame.pack(pady=10)
+group_checkboxes = {}
+row = 0
+col = 0
+for group in grupos:
+    var = tk.BooleanVar()
+    checkbox = tk.Checkbutton(groups_frame, text=group, variable=var)
+    checkbox.grid(row=row, column=col, padx=5, pady=2, sticky="w")
+    group_checkboxes[group] = var
+    col += 1
+    if col == 5:
+        col = 0
+        row += 1
 
-scrolled_canvas = tk.Canvas(scrolled_frame, height=200)
-scrolled_canvas.pack(side=tk.LEFT, fill=tk.Y)
+# Menú desplegable para seleccionar un usuario existente para agregar a los grupos
+username_label_groups = tk.Label(window, text="Seleccionar usuario:")
+username_label_groups.pack()
+users_dropdown_groups = tk.StringVar(window)
+users_dropdown_groups.set(usuarios[0])  # Establecer el valor inicial del menú
+users_menu_groups = tk.OptionMenu(window, users_dropdown_groups, *usuarios, command=mostrar_grupos)
+users_menu_groups.pack()
 
-scrollbar = tk.Scrollbar(scrolled_frame, orient=tk.VERTICAL, command=scrolled_canvas.yview)
-scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+# Botón para agregar al usuario a los grupos seleccionados
+agregar_grupos_button = tk.Button(window, text="Añadir a grupos", command=agregar_a_grupos)
+agregar_grupos_button.pack(pady=5)
 
-scrolled_canvas.configure(yscrollcommand=scrollbar.set)
-scrolled_canvas.bind('<Configure>', lambda e: scrolled_canvas.configure(scrollregion=scrolled_canvas.bbox("all")))
-
-frame_grupos = tk.Frame(scrolled_canvas)
-scrolled_canvas.create_window((0, 0), window=frame_grupos, anchor=tk.NW)
-
-grupos = []
-grupos_nombres = cargar_grupos()
-
-for i, nombre in enumerate(grupos_nombres):
-    grupo_var = tk.BooleanVar()
-    grupo = tk.Checkbutton(frame_grupos, text=nombre, variable=grupo_var)
-    grupo.grid(row=i // 5, column=i % 5, sticky=tk.W)
-    grupos.append(grupo_var)
-
-etiqueta_grupos_adicionales = tk.Label(ventana, text="Grupos adicionales:")
-etiqueta_grupos_adicionales.pack()
-
-scrolled_frame_adicionales = tk.Frame(ventana)
-scrolled_frame_adicionales.pack()
-
-scrolled_canvas_adicionales = tk.Canvas(scrolled_frame_adicionales, height=200)
-scrolled_canvas_adicionales.pack(side=tk.LEFT, fill=tk.Y)
-
-scrollbar_adicionales = tk.Scrollbar(scrolled_frame_adicionales, orient=tk.VERTICAL, command=scrolled_canvas_adicionales.yview)
-scrollbar_adicionales.pack(side=tk.RIGHT, fill=tk.Y)
-
-scrolled_canvas_adicionales.configure(yscrollcommand=scrollbar_adicionales.set)
-scrolled_canvas_adicionales.bind('<Configure>', lambda e: scrolled_canvas_adicionales.configure(scrollregion=scrolled_canvas_adicionales.bbox("all")))
-
-frame_grupos_adicionales = tk.Frame(scrolled_canvas_adicionales)
-scrolled_canvas_adicionales.create_window((0, 0), window=frame_grupos_adicionales, anchor=tk.NW)
-
-grupos_adicionales = []
-grupos_adicionales_nombres = cargar_grupos()
-
-for i, nombre in enumerate(grupos_adicionales_nombres):
-    grupo_adicional_var = tk.BooleanVar()
-    grupo_adicional = tk.Checkbutton(frame_grupos_adicionales, text=nombre, variable=grupo_adicional_var)
-    grupo_adicional.grid(row=i // 5, column=i % 5, sticky=tk.W)
-    grupos_adicionales.append(grupo_adicional_var)
-
-boton_crear = tk.Button(ventana, text="Crear usuario", command=crear_usuario)
-boton_crear.pack()
-
-ventana.mainloop()
+# Ejecutar el bucle principal de la interfaz de usuario
+window.mainloop()
