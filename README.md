@@ -1,2 +1,2 @@
-# permisos
-Gestion de usuario y permisos 
+# Per-Miso(s)
+Gestion de usuario y grupos 
